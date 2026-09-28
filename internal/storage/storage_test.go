@@ -133,18 +133,18 @@ func TestPathHandlingIsSafe(t *testing.T) {
 	// requirement is not "no traversal" but "a nonsensical or device-like path
 	// is refused rather than silently doing something surprising".
 	base := t.TempDir()
-	// CI runners sometimes restrict file creation directly in the temp dir root.
-	// Create a dedicated subdirectory we control.
+	// CI runners sometimes restrict file creation directly in the temp dir root
+	// or with certain characters. Use a simple subdirectory we control.
 	testDir := filepath.Join(base, "testdb")
 	if err := os.MkdirAll(testDir, 0o700); err != nil {
 		t.Fatalf("creating test dir: %v", err)
 	}
 	for _, name := range []string{
-		"bad\x00name.db",
-		"tab\tdir/db.db",
-		"newline\n.db",
-		".",
-		"..",
+		"bad\x00name.db",       // null byte in filename
+		"bad\u0001name.db",     // control character in filename  
+		"newline\n.db",         // newline in filename
+		".",                     // current directory
+		"..",                    // parent directory
 	} {
 		if _, err := Open(context.Background(), Options{Path: filepath.Join(testDir, name)}); err == nil {
 			t.Errorf("a malformed database path was accepted: %q", name)

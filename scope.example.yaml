@@ -1,0 +1,101 @@
+# Example scope file.
+#
+# Validate this before every engagement:
+#
+#     bugbounty scope check scope.yaml
+#
+# The check reports the policy that will actually apply, after the loader has
+# clamped it, so it shows the limits in force rather than the ones requested.
+#
+# The keys below are the complete schema. The decoder runs in strict mode, so a
+# misspelled key is an error rather than a safety setting that quietly does
+# nothing.
+
+version: 1
+
+metadata:
+  # Copied into every report. A reader must be able to tell which engagement a
+  # finding belongs to, and must be able to verify that the tester was
+  # authorised to do what they did.
+  program: Example Bug Bounty
+  reference: "https://example.com/bug-bounty/policy"
+  operator: your-handle
+  notes: |
+    Engagement 2026-Q3. Any finding outside this file is out of scope even if
+    it looks like a bug.
+  # Surfaced in reports as a reminder. The toolkit does NOT enforce a calendar
+  # deadline; keeping to it is the operator's responsibility.
+  authorized_until: "2026-12-31"
+
+scope:
+  allowed:
+    # An apex domain. This covers example.com and, per the sub-domain rule
+    # below, any name beneath it.
+    - example.com
+    # A wildcard for a specific subdomain zone. The leading "*." is required
+    # and must be the whole leftmost label; a bare "*" is rejected.
+    - "*.dev.example.com"
+    # An address or a CIDR is permitted too, and is useful when a programme
+    # publishes a range to scan.
+    - 192.0.2.0/24
+    # A literal address. A bare address is deliberate: names that merely
+    # resolve to a special-purpose address are refused, and only an explicit
+    # IP or CIDR rule authorises one.
+    - 198.51.100.10
+
+  excluded:
+    # Exclusions win. An excluded name is denied even when a wildcard above
+    # covers it, so this is how an internal or staging host is carved out.
+    - staging.example.com
+    - "*.internal.example.com"
+    # A path prefix is honoured for URL checks, so a whole subtree can be
+    # withheld while the rest of the host stays in scope. A path rule must be
+    # a full http/https URL: a bare "example.com/admin" is not a path rule, it
+    # is an invalid domain, and is rejected at load time rather than ignored.
+    - "https://example.com/admin-internal"
+
+policy:
+  # The single most important switch. When true, no active stage runs and no
+  # packet is sent to a target at all. It can also be set with --passive-only.
+  passive_only: false
+
+  # Rate and concurrency. Both are clamped to hard ceilings (100 rps, 200
+  # concurrent) that no scope file can raise, because a file is written in
+  # haste and a provider's published limit is not always the safe one.
+  max_rps: 5
+  max_concurrency: 5
+
+  # Total requests for one run. A hard stop, not a suggestion: it is the
+  # budget that keeps an assessment inside what the programme agreed to.
+  max_requests_per_run: 2000
+
+  # Per-request limits.
+  request_timeout: 10s
+  max_redirects: 5
+  max_response_bytes: 2097152
+
+  # Honour robots.txt. It defaults on; the value is spelled out so that
+  # switching it off is a visible, deliberate line in the file rather than an
+  # omission. Turning it off raises a warning every run.
+  respect_robots: true
+
+  # Ports to probe. Empty means the standard set only.
+  allowed_ports:
+    - 80
+    - 443
+
+  # Present in the schema so that setting it is an explicit, warned-about act
+  # rather than an accident. It has no effect: the loader forces it off, and
+  # the cloud metadata endpoint is never contacted. Reading 169.254.169.254
+  # hands an attacker the instance credentials, and no programme authorises it.
+  allow_cloud_metadata: false
+
+sources:
+  # Passive sources to run, before anything active.
+  enabled:
+    - certtransparency
+
+  # API keys are never written here. This section lists only non-secret
+  # settings; credentials come from the environment via the configuration
+  # file, and are resolved at run time.
+  options: {}

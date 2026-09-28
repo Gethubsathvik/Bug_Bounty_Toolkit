@@ -1,0 +1,26 @@
+# Build output
+/bugbounty
+/bugbounty.exe
+/dist/
+*.exe
+*.test
+*.out
+
+# Test scratch directories
+/.tmp/
+/.gotmp/
+
+# Local state
+*.db
+*.db-wal
+*.db-shm
+/bugbounty.yaml
+/scopes.local.yaml
+/out/
+/reports/
+
+# Editor and OS noise
+.idea/
+.vscode/
+*.swp
+.DS_Store

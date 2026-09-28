@@ -1,0 +1,140 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The network-facing tests bind loopback servers and, in a few places, stand
+  # in for DNS. They need no outbound access, so the job is given none: a test
+  # that quietly started reaching the public internet would be a finding in
+  # itself.
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          check-latest: true
+
+      - name: Verify the module graph
+        run: go mod verify
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -count=1 -timeout 15m ./...
+
+      - name: Build
+        run: go build -trimpath -o bugbounty ./cmd/bugbounty
+
+  # The race detector needs cgo and a C compiler, which the default toolchain
+  # image lacks. It runs on Linux only: the limiter and the crawler are the
+  # concurrent parts, and those are exercised identically on every platform.
+  race:
+    name: race detector
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Test with the race detector
+        run: go test -count=1 -race -timeout 20m ./...
+
+  # Guards the formatting invariant, so a diff never contains whitespace the
+  # next contributor has to strip back out.
+  fmt:
+    name: gofmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-clean:"
+            echo "$unformatted"
+            echo "Run 'make fmt' and commit the result."
+            exit 1
+          fi
+
+  # Confirms the published image still builds, and that the binary inside it
+  # agrees with the source about its own version.
+  image:
+    name: container image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: bugbounty:ci
+          build-args: |
+            VERSION=${{ github.sha }}
+
+      - name: The image runs, as an unprivileged user
+        run: |
+          # Entrypoint is the binary, so this is a real invocation rather than
+          # a check that the file exists.
+          docker run --rm bugbounty:ci version
+          # The bare invocation must print help and scan nothing.
+          docker run --rm bugbounty:ci > /tmp/help.txt
+          grep -q "Available Commands" /tmp/help.txt
+          # A scan with no scope file must refuse rather than start.
+          if docker run --rm bugbounty:ci scan example.com; then
+            echo "SECURITY: a scan ran with no scope file"
+            exit 1
+          fi
+
+  # gosec is advisory: it is allowed to fail this job, so a new finding shows
+  # up as a comment rather than blocking an urgent fix from landing. Treat it
+  # as a review queue.
+  gosec:
+    name: gosec (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Run gosec
+        uses: securego/gosec@master
+        with:
+          args: '-no-fail -fmt sarif -out gosec.sarif ./...'
+
+      - name: Upload the report
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gosec.sarif
+          category: gosec

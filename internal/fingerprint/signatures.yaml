@@ -1,0 +1,381 @@
+# Data-driven technology fingerprints.
+#
+# Signatures are matched against observable response properties only: response
+# headers, cookie names, HTML markers, referenced asset names and a few
+# structural characteristics. Nothing here sends an extra request, which is
+# what makes the module passive.
+#
+# Every regex below is compiled with a size and complexity bound at load time;
+# a signature whose pattern is too large or not anchored safely is rejected
+# rather than run against hostile input.
+version: 1
+
+technologies:
+  # ------------------------------------------------------------ web servers --
+  - name: nginx
+    category: web-server
+    confidence: high
+    headers:
+      server: ['(?i)\bnginx\b']
+
+  - name: Apache
+    category: web-server
+    confidence: high
+    headers:
+      server: ['(?i)\bapache\b']
+
+  - name: Apache httpd
+    category: web-server
+    confidence: high
+    headers:
+      server: ['(?i)\bhttpd\b']
+
+  - name: Microsoft IIS
+    category: web-server
+    confidence: high
+    headers:
+      server: ['(?i)\bmicrosoft-iis\b', '(?i)^IIS/']
+    body:
+      - regex: '(?i)asp\.net'
+        weight: low
+
+  - name: Caddy
+    category: web-server
+    confidence: high
+    headers:
+      server: ['(?i)\bcaddy\b']
+
+  - name: LiteSpeed
+    category: web-server
+    confidence: high
+    headers:
+      server: ['(?i)\blitespeed\b']
+
+  - name: openresty
+    category: web-server
+    confidence: high
+    headers:
+      server: ['(?i)\bopenresty\b']
+
+  - name: Traefik
+    category: proxy
+    confidence: high
+    headers:
+      server: ['(?i)\btraefik\b']
+
+  - name: Envoy
+    category: proxy
+    confidence: high
+    headers:
+      server: ['(?i)\benvoy\b']
+    body:
+      - regex: '(?i)istio|x-envoy'
+        weight: low
+
+  - name: AWS ALB
+    category: load-balancer
+    confidence: high
+    headers:
+      server: ['(?i)\bawselb\b', '(?i)^AmazonS3$']
+
+  - name: AWS CloudFront
+    category: cdn
+    confidence: high
+    headers:
+      server: ['(?i)\bcloudfront\b', '(?i)^CloudFront$']
+      via: ['(?i)\bcloudfront\b']
+      x-amz-cf-id: ['.']
+
+  - name: Akamai
+    category: cdn
+    confidence: medium
+    headers:
+      server: ['(?i)\bakamai\w*\b']
+      x-akamai-transformed: ['.']
+
+  - name: Fastly
+    category: cdn
+    confidence: medium
+    headers:
+      x-fastly-request-id: ['.']
+      via: ['(?i)\bvarnish\b']
+
+  - name: Cloudflare
+    category: cdn
+    confidence: high
+    headers:
+      server: ['(?i)\bcloudflare\b']
+      cf-ray: ['.']
+      cf-cache-status: ['.']
+
+  - name: Amazon S3
+    category: storage
+    confidence: high
+    headers:
+      server: ['(?i)^AmazonS3$', '(?i)\bamazons3\b']
+    body:
+      - regex: '(?i)<NoSuchKey>|NoSuchBucket|ListBucketResult'
+        weight: medium
+
+  # ------------------------------------------------------------- frameworks --
+  - name: WordPress
+    category: cms
+    confidence: high
+    body:
+      - regex: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']WordPress'
+        weight: high
+      - regex: '(?i)/wp-content/|/wp-includes/'
+        weight: medium
+
+  - name: Drupal
+    category: cms
+    confidence: high
+    headers:
+      x-generator: ['(?i)drupal']
+      x-drupal-cache: ['.']
+    body:
+      - regex: '(?i)<meta[^>]+generator[^>]+drupal'
+        weight: high
+
+  - name: Joomla
+    category: cms
+    confidence: high
+    body:
+      - regex: '(?i)/media/jui/|content=["''] Joomla'
+        weight: high
+
+  - name: Drupal XDEBUG
+    category: debug
+    confidence: high
+    headers:
+      x-powered-by: ['(?i)xdebug']
+
+  - name: PHP
+    category: language
+    confidence: high
+    headers:
+      x-powered-by: ['(?i)php']
+      set-cookie: ['(?i)phpsessid']
+    body:
+      - regex: '\.php(?:\?|"|\'')'
+        weight: low
+
+  - name: ASP.NET
+    category: framework
+    confidence: high
+    headers:
+      x-powered-by: ['(?i)asp\.net']
+      x-aspnet-version: ['.']
+      set-cookie: ['(?i)ASP\.NET_SessionId']
+
+  - name: Ruby on Rails
+    category: framework
+    confidence: high
+    headers:
+      x-runtime: ['.']
+      set-cookie: ['(?i)_session_id']
+    body:
+      - regex: '(?i)data-remote="true"|/assets/rails-'
+        weight: medium
+
+  - name: Laravel
+    category: framework
+    confidence: medium
+    headers:
+      set-cookie: ['(?i)laravel_session']
+
+  - name: Express
+    category: framework
+    confidence: medium
+    headers:
+      x-powered-by: ['(?i)\bexpress\b']
+
+  - name: Flask
+    category: framework
+    confidence: low
+    headers:
+      server: ['(?i)\bwerkzeug\b']
+
+  - name: Django
+    category: framework
+    confidence: medium
+    headers:
+      x-frame-options: ['(?i)\bsameorigin\b']
+    body:
+      - regex: '(?i)csrfmiddlewaretoken'
+        weight: medium
+
+  - name: Spring Boot
+    category: framework
+    confidence: high
+    headers:
+      x-application-context: ['.']
+    body:
+      - regex: '(?i)whitelabel error page'
+        weight: medium
+
+  - name: Java
+    category: language
+    confidence: medium
+    headers:
+      set-cookie: ['(?i)JSESSIONID']
+
+  # ------------------------------------------------------------- JavaScript --
+  - name: jQuery
+    category: javascript
+    confidence: high
+    body:
+      - regex: 'jquery[-\w.]*\.js'
+        weight: medium
+      - regex: 'jQuery\.fn\.jquery'
+        weight: high
+
+  - name: React
+    category: javascript
+    confidence: high
+    body:
+      - regex: 'data-reactroot'
+        weight: high
+      - regex: '__REACT_DEVTOOLS'
+        weight: low
+      - regex: '/_next/static/|react(?:-dom)?(?:\.production)?(?:\.min)?\.js'
+        weight: medium
+
+  - name: Next.js
+    category: framework
+    confidence: high
+    body:
+      - regex: '/_next/static/'
+        weight: high
+      - regex: '__NEXT_DATA__'
+        weight: high
+
+  - name: Vue.js
+    category: javascript
+    confidence: high
+    body:
+      - regex: 'data-v-[0-9a-f]{8}|__VUE__'
+        weight: high
+      - regex: 'vue(?:\.min)?\.js'
+        weight: medium
+
+  - name: Angular
+    category: framework
+    confidence: high
+    body:
+      - regex: 'ng-version=|ng-app|\[ng-'
+        weight: high
+      - regex: 'angular(?:\.min)?\.js'
+        weight: medium
+
+  - name: Svelte
+    category: framework
+    confidence: medium
+    body:
+      - regex: 'svelte-[0-9a-z]{6}\.js'
+        weight: high
+
+  - name: Nuxt
+    category: framework
+    confidence: high
+    body:
+      - regex: '__NUXT__'
+        weight: high
+
+  - name: Bootstrap
+    category: css
+    confidence: high
+    body:
+      - regex: 'bootstrap(?:[-\w.]*)?(?:\.min)?\.(?:css|js)'
+        weight: high
+      - regex: 'class="[^"]*\b(?:col-md-\d|navbar-expand-)'
+        weight: low
+
+  - name: Tailwind CSS
+    category: css
+    confidence: high
+    body:
+      - regex: 'tailwind(?:-\w+)?(?:\.min)?\.css'
+        weight: high
+      - regex: 'class="[^"]*\b(?:flex|grid)\s+(?:items-|justify-)?(?:center|flex|grid)'
+        weight: low
+
+  - name: jQuery UI
+    category: javascript
+    confidence: high
+    body:
+      - regex: 'jquery-ui[-\w.]*\.js'
+        weight: high
+
+  - name: Google Analytics
+    category: analytics
+    confidence: high
+    body:
+      - regex: 'google-analytics\.com/(?:ga|analytics)\.js|gtag\('
+        weight: high
+
+  - name: Google reCAPTCHA
+    category: third-party
+    confidence: high
+    body:
+      - regex: 'recaptcha(?:/api\.js)?'
+        weight: high
+
+  - name: Segment
+    category: analytics
+    confidence: medium
+    body:
+      - regex: 'cdn\.segment\.com'
+        weight: high
+
+  # ---------------------------------------------------------- API gateways ---
+  - name: AWS API Gateway
+    category: api-gateway
+    confidence: high
+    headers:
+      x-amzn-requestid: ['.']
+      x-amz-apigw-id: ['.']
+    body:
+      - regex: '"message"\s*:\s*"(?:Unauthorized|Forbidden|Missing Authentication Token)"'
+        weight: medium
+
+  - name: Swagger UI
+    category: api-docs
+    confidence: high
+    body:
+      - regex: 'swagger-ui(?:@|/|-)[\w.-]*\.?(?:js|css)?|SwaggerUIBundle'
+        weight: high
+
+  - name: OpenAPI
+    category: api-docs
+    confidence: high
+    body:
+      - regex: '"openapi"\s*:\s*"[23]\.'
+        weight: high
+
+  - name: GraphQL
+    category: api
+    confidence: medium
+    body:
+      - regex: '__typename|IntrospectionQuery|/graphql'
+        weight: medium
+
+  - name: Kubernetes
+    category: platform
+    confidence: high
+    headers:
+      server: ['(?i)kube-apiserver']
+    body:
+      - regex: '"kind"\s*:\s*"Status"'
+        weight: low
+
+  - name: GitLab
+    category: devops
+    confidence: high
+    body:
+      - regex: 'gitlab'
+        weight: low
+    headers:
+      x-gitlab: ['.']
+      x-request-id: ['.']
+      set-cookie: ['(?i)_gitlab_session']

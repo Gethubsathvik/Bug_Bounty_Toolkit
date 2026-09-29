@@ -1,4 +1,4 @@
-# 🐛 bugbounty
+# 🐛 bugbounty  [![ci](https://github.com/Gethubsathvik/Bug_Bounty_Toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Gethubsathvik/Bug_Bounty_Toolkit/actions/workflows/ci.yml)
 
 [![Go](https://img.shields.io/badge/go-1.26%2B-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev/)
 [![CI](https://github.com/bbtoolkit/bugbounty/actions/workflows/ci.yml/badge.svg)](https://github.com/bbtoolkit/bugbounty/actions/workflows/ci.yml)

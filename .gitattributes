@@ -1,0 +1,15 @@
+# Normalise line endings on checkout so a Windows working tree matches the LF
+# bytes that CI checks. Without this, core.autocrlf rewrites every .go file to
+# CRLF locally and `gofmt -l .` flags the whole repository, while CI — which
+# checks out with LF — is unaffected.
+* text=auto eol=lf
+
+# Shell scripts must stay LF or the shebang breaks.
+*.sh text eol=lf
+
+# Binary assets are never touched.
+*.db text=auto
+*.sqlite text=auto
+*.png binary
+*.jpg binary
+*.pdf binary

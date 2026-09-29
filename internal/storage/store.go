@@ -81,10 +81,19 @@ func Open(ctx context.Context, opts Options) (*Store, error) {
 	if opts.BusyTimeout <= 0 {
 		opts.BusyTimeout = 5 * time.Second
 	}
-	if dir := filepath.Dir(opts.Path); dir != "" && dir != "." {
+	dir := filepath.Dir(opts.Path)
+	if dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return nil, fmt.Errorf("creating database directory: %w", err)
 		}
+	}
+	// A directory is never a database, and it must be refused before anything is
+	// created or altered. The chmod below would otherwise strip the search bit
+	// from a real directory, leaving a tree the owner can no longer write to or
+	// clean up. A path like "some/dir/." or "some/dir/.." reaches here intact
+	// because filepath.Clean is not applied to operator input.
+	if info, err := os.Lstat(opts.Path); err == nil && info.IsDir() {
+		return nil, fmt.Errorf("database path %q is a directory", opts.Path)
 	}
 	// The file may contain reconnaissance results; keep it owner-only.
 	_ = os.Chmod(opts.Path, 0o600)

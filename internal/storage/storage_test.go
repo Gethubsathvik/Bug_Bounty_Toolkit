@@ -140,14 +140,35 @@ func TestPathHandlingIsSafe(t *testing.T) {
 		t.Fatalf("creating test dir: %v", err)
 	}
 	for _, name := range []string{
-		"bad\x00name.db",       // null byte in filename
-		"bad\u0001name.db",     // control character in filename  
-		"newline\n.db",         // newline in filename
-		".",                     // current directory
-		"..",                    // parent directory
+		"bad\x00name.db",   // null byte in filename
+		"bad\u0001name.db", // control character in filename
+		"newline\n.db",     // newline in filename
+		".",                // current directory
+		"..",               // parent directory
 	} {
 		if _, err := Open(context.Background(), Options{Path: filepath.Join(testDir, name)}); err == nil {
 			t.Errorf("a malformed database path was accepted: %q", name)
+		}
+	}
+	// filepath.Join above cleans "." and "..", so those two cases reach Open as
+	// real directory paths and exercise the is-a-directory refusal. The base-name
+	// check in validateDBPath is only reachable with an uncleaned path, which is
+	// what an operator or a script can hand us directly.
+	for _, p := range []string{".", "..", "some/dir/.", "some/dir/.."} {
+		if _, err := Open(context.Background(), Options{Path: p}); err == nil {
+			t.Errorf("a path naming a directory was accepted: %q", p)
+		}
+	}
+	// A directory that Open refused must be left exactly as it was found. The
+	// owner-only chmod applies to database files; applying it to a directory
+	// strips the search bit and makes the tree unwritable and unremovable.
+	for _, dir := range []string{base, testDir} {
+		info, err := os.Stat(dir)
+		if err != nil {
+			t.Fatalf("stat %q: %v", dir, err)
+		}
+		if perm := info.Mode().Perm(); perm&0o700 != 0o700 {
+			t.Errorf("Open altered the permissions of the refused directory %q: %04o", dir, perm)
 		}
 	}
 	// A normal relative name inside the chosen directory still works.
